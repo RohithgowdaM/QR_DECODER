@@ -62,6 +62,7 @@ def upload_photo():
         if response.status_code == 200 and response_data:
             # Get the row ID for updating
             row_id = response_data[0].get("id")
+            name= response_data[0].get("Full Name")
             if row_id:
                 update_data = {"Attended Event?": "Attended"}
                 update_response = requests.patch(
@@ -72,7 +73,8 @@ def upload_photo():
                     response_messages.append({
                         "Email": Email,
                         "Phone": Phone,
-                        "message": f"Attendance marked for {Email}."
+                        "Name":name,
+                        "message": f"Attendance marked for {name}."
                     })
                 else:
                     response_messages.append({

@@ -288,13 +288,16 @@ canvas {
             } else {
               resultItem.classList.add('error');
             }
+            alert(`${item.Email || 'Unknown Email'} (${item.Phone || 'Unknown Phone'}): ${item.message}`)
             resultItem.textContent = `${item.Email || 'Unknown Email'} (${item.Phone || 'Unknown Phone'}): ${item.message}`;
             resultContainer.appendChild(resultItem);
+            window.location.href = "/";
           });
         } else if (result.error) {
           const errorItem = document.createElement('div');
           errorItem.className = 'result-item error';
           errorItem.textContent = `Error: ${result.error}`;
+          alert(`Error: ${result.error}`)
           resultContainer.appendChild(errorItem);
         }
       } catch (error) {
