@@ -1,158 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Code Scanner API</title>
-  <link rel="stylesheet" href="index.css">
-  <style>
-   /* General Reset */
-body, h1, p, button, input {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Arial', sans-serif;
-}
-
-body {
-  background: linear-gradient(135deg, #f0f8ff, #e6e6fa);
-  color: #333;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 20px;
-  text-align: center;
-}
-
-h1 {
-  font-size: 2rem;
-  margin-bottom: 20px;
-  color: #4a90e2;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-#input-container {
-  width: 100%;
-  max-width: 400px;
-  padding: 20px;
-  background-color: #fff;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
-  display: none; /* Hide by default */
-}
-
-/* Make input container visible only on mobile */
-@media (max-width: 768px) {
-  #input-container {
-    display: block;
-  }
-}
-
-input[type="file"] {
-  width: 100%;
-  padding: 10px;
-  font-size: 1rem;
-  border: 2px dashed #4a90e2;
-  border-radius: 8px;
-  background-color: #f9f9f9;
-  color: #4a90e2;
-  cursor: pointer;
-  outline: none;
-}
-
-input[type="file"]:hover {
-  background-color: #eaf4ff;
-}
-
-#desktop-container {
-  width: 100%;
-  max-width: 400px;
-  padding: 20px;
-  background-color: #fff;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
-}
-
-video {
-  width: 100%; /* Ensure video fits properly */
-  border: 2px solid #ddd;
-  border-radius: 10px;
-}
-
-canvas {
-  width: 100%; /* Ensure canvas fits properly */
-  height: auto;
-  border: 2px solid #ddd;
-  border-radius: 10px;
-  display: none;
-}
-
-#controls button {
-  background-color: #4a90e2;
-  color: #fff;
-  border: none;
-  border-radius: 5px;
-  padding: 10px 15px;
-  font-size: 1rem;
-  cursor: pointer;
-  margin: 5px;
-  transition: background-color 0.3s ease;
-}
-
-#controls button:hover {
-  background-color: #357abd;
-}
-
-#photo {
-  max-width: 100%;
-  border: 2px solid #4a90e2;
-  border-radius: 10px;
-  margin-top: 10px;
-}
-
-#result {
-  width: 100%;
-  max-width: 400px;
-  text-align: left;
-}
-
-.result-item {
-  padding: 10px;
-  margin: 5px 0;
-  border-radius: 5px;
-}
-
-.success {
-  background-color: #eaffea;
-  color: #2a7a2a;
-}
-
-.error {
-  background-color: #ffeaea;
-  color: #a72a2a;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  h1 {
-    font-size: 1.5rem;
-  }
-
-  #controls button {
-    width: 100%;
-  }
-
-  input[type="file"] {
-    font-size: 0.9rem;
-  }
-}
-
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static',filename='styles/index.css') }}">
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static',filename='favicon.ico') }}">
 </head>
+
 <body>
   <h1>QR Code Attendance Scanner</h1>
 
@@ -160,8 +16,9 @@ canvas {
   <div id="input-container">
     <p>Use this button to upload a photo:</p>
     <input id="file-input" type="file" accept="image/*" capture="environment">
+    <button id="mobile-send" style="margin-top: 10px; display: none;">Submit Photo</button>
   </div>
-
+  
   <!-- Laptop/Desktop camera -->
   <div id="desktop-container">
     <video id="video" autoplay playsinline></video>
@@ -192,17 +49,66 @@ canvas {
     let videoStream = null;
 
     if (isMobile) {
-      // Show the mobile file input if the user is on mobile
-      inputContainer.style.display = 'block';
-
+      // Mobile-specific elements
       const fileInput = document.getElementById('file-input');
-      fileInput.addEventListener('change', async (event) => {
-        const file = event.target.files[0];
-        if (file) {
-          await processPhoto(file);
+      const mobileSendButton = document.getElementById('mobile-send');
+      let selectedFile = null; // To store the selected file
+    
+      // Handle file selection
+      fileInput.addEventListener('change', (event) => {
+        selectedFile = event.target.files[0];
+        if (selectedFile) {
+          mobileSendButton.style.display = 'block'; // Make the button visible
         }
       });
-    } else {
+    
+      mobileSendButton.addEventListener('click', async () => {
+        if (selectedFile) {
+          mobileSendButton.disabled = true; // Prevent multiple submissions
+          const formData = new FormData();
+          formData.append('photo', selectedFile);
+      
+          try {
+            const response = await fetch('/upload', {
+              method: 'POST',
+              body: formData,
+            });
+      
+            const result = await response.json();
+            resultContainer.innerHTML = ''; // Clear previous results
+      
+            if (response.ok && result.responses) {
+              result.responses.forEach(item => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                if (item.message.includes('marked')) {
+                  resultItem.classList.add('success');
+                } else {
+                  resultItem.classList.add('error');
+                }
+                alert(`${item.Email || 'Unknown Email'} (${item.Phone || 'Unknown Phone'}): ${item.message}`);
+                resultItem.textContent = `${item.Email || 'Unknown Email'} (${item.Phone || 'Unknown Phone'}): ${item.message}`;
+                resultContainer.appendChild(resultItem);
+              });
+            } else if (result.error) {
+              const errorItem = document.createElement('div');
+              errorItem.className = 'result-item error';
+              errorItem.textContent = `Error: ${result.error}`;
+              alert(`Error: ${result.error}`);
+              resultContainer.appendChild(errorItem);
+            }
+          } catch (error) {
+            console.error(error);
+            resultContainer.innerHTML = '<div class="result-item error">An error occurred while sending the photo.</div>';
+          } finally {
+            mobileSendButton.disabled = false; // Re-enable the button
+          }
+        } else {
+          alert('Please select a photo first.');
+        }
+      });
+    }
+     else {
       // Show the camera controls for laptop/desktop
       desktopContainer.style.display = 'block';
 
@@ -307,4 +213,5 @@ canvas {
     }
   </script>
 </body>
+
 </html>
