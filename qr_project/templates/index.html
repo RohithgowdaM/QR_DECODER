@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Scanner API</title>
+  <link rel="stylesheet" href="index.css">
+  <style>
+   /* General Reset */
+body, h1, p, button, input {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Arial', sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #f0f8ff, #e6e6fa);
+  color: #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  text-align: center;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 20px;
+  color: #4a90e2;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+#input-container {
+  width: 100%;
+  max-width: 400px;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  display: none; /* Hide by default */
+}
+
+/* Make input container visible only on mobile */
+@media (max-width: 768px) {
+  #input-container {
+    display: block;
+  }
+}
+
+input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  font-size: 1rem;
+  border: 2px dashed #4a90e2;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  color: #4a90e2;
+  cursor: pointer;
+  outline: none;
+}
+
+input[type="file"]:hover {
+  background-color: #eaf4ff;
+}
+
+#desktop-container {
+  width: 100%;
+  max-width: 400px;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+video {
+  width: 100%; /* Ensure video fits properly */
+  border: 2px solid #ddd;
+  border-radius: 10px;
+}
+
+canvas {
+  width: 100%; /* Ensure canvas fits properly */
+  height: auto;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  display: none;
+}
+
+#controls button {
+  background-color: #4a90e2;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 15px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin: 5px;
+  transition: background-color 0.3s ease;
+}
+
+#controls button:hover {
+  background-color: #357abd;
+}
+
+#photo {
+  max-width: 100%;
+  border: 2px solid #4a90e2;
+  border-radius: 10px;
+  margin-top: 10px;
+}
+
+#result {
+  width: 100%;
+  max-width: 400px;
+  text-align: left;
+}
+
+.result-item {
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 5px;
+}
+
+.success {
+  background-color: #eaffea;
+  color: #2a7a2a;
+}
+
+.error {
+  background-color: #ffeaea;
+  color: #a72a2a;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  #controls button {
+    width: 100%;
+  }
+
+  input[type="file"] {
+    font-size: 0.9rem;
+  }
+}
+
+  </style>
+</head>
+<body>
+  <h1>QR Code Attendance Scanner</h1>
+
+  <!-- Mobile input for photo -->
+  <div id="input-container">
+    <p>Use this button to upload a photo:</p>
+    <input id="file-input" type="file" accept="image/*" capture="environment">
+  </div>
+
+  <!-- Laptop/Desktop camera -->
+  <div id="desktop-container">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <div id="controls">
+      <button id="capture">Capture Photo</button>
+      <button id="retake" style="display: none;">Retake Photo</button>
+      <button id="send" style="display: none;">Send Photo</button>
+    </div>
+  </div>
+
+  <img id="photo" alt="Captured photo will appear here" style="display: none;">
+  <div id="result"></div>
+
+  <script>
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const inputContainer = document.getElementById('input-container');
+    const desktopContainer = document.getElementById('desktop-container');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const photo = document.getElementById('photo');
+    const captureButton = document.getElementById('capture');
+    const retakeButton = document.getElementById('retake');
+    const sendButton = document.getElementById('send');
+    const resultContainer = document.getElementById('result');
+    const ctx = canvas.getContext('2d');
+
+    let videoStream = null;
+
+    if (isMobile) {
+      // Show the mobile file input if the user is on mobile
+      inputContainer.style.display = 'block';
+
+      const fileInput = document.getElementById('file-input');
+      fileInput.addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          await processPhoto(file);
+        }
+      });
+    } else {
+      // Show the camera controls for laptop/desktop
+      desktopContainer.style.display = 'block';
+
+      async function startCamera() {
+        try {
+          videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          video.srcObject = videoStream;
+        } catch (error) {
+          alert('Unable to access the camera.');
+          console.error(error);
+        }
+      }
+
+      function capturePhoto() {
+        // Stop the video stream after capturing the photo
+        if (videoStream) {
+          const tracks = videoStream.getTracks();
+          tracks.forEach(track => track.stop());
+        }
+        video.style.display = 'none'; // Hide the video stream
+
+        // Correctly set canvas dimensions based on video dimensions
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // Draw the current frame from the video onto the canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convert canvas to image and display
+        const dataUrl = canvas.toDataURL('image/png');
+        photo.src = dataUrl;
+        photo.style.display = 'block';
+
+        // Show buttons for retaking or sending the photo
+        captureButton.style.display = 'none';
+        retakeButton.style.display = 'inline-block';
+        sendButton.style.display = 'inline-block';
+      }
+
+      function retakePhoto() {
+        // Restart the camera
+        photo.style.display = 'none';
+        video.style.display = 'block';
+        captureButton.style.display = 'inline-block';
+        retakeButton.style.display = 'none';
+        sendButton.style.display = 'none';
+        startCamera();
+      }
+
+      async function sendPhoto() {
+        const dataUrl = canvas.toDataURL('image/png');
+        const blob = await (await fetch(dataUrl)).blob();
+
+        await processPhoto(blob);
+      }
+
+      captureButton.addEventListener('click', capturePhoto);
+      retakeButton.addEventListener('click', retakePhoto);
+      sendButton.addEventListener('click', sendPhoto);
+
+      startCamera();
+    }
+
+    async function processPhoto(file) {
+      const formData = new FormData();
+      formData.append('photo', file);
+
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+        resultContainer.innerHTML = ''; // Clear previous results
+
+        if (response.ok && result.responses) {
+          result.responses.forEach(item => {
+            const resultItem = document.createElement('div');
+            resultItem.className = 'result-item';
+            if (item.message.includes('marked')) {
+              resultItem.classList.add('success');
+            } else {
+              resultItem.classList.add('error');
+            }
+            resultItem.textContent = `${item.Email || 'Unknown Email'} (${item.Phone || 'Unknown Phone'}): ${item.message}`;
+            resultContainer.appendChild(resultItem);
+          });
+        } else if (result.error) {
+          const errorItem = document.createElement('div');
+          errorItem.className = 'result-item error';
+          errorItem.textContent = `Error: ${result.error}`;
+          resultContainer.appendChild(errorItem);
+        }
+      } catch (error) {
+        console.error(error);
+        resultContainer.innerHTML = '<div class="result-item error">An error occurred while sending the photo.</div>';
+      }
+    }
+  </script>
+</body>
+</html>
