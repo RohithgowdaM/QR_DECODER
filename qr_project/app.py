@@ -46,7 +46,6 @@ def upload_photo():
         return jsonify({"error": "No QR code detected"}), 400
     
     response_messages = []
-
     try:
         qr_data = json.loads(qr_data)  # Assuming the QR code contains JSON data
         Email = qr_data.get("Email")
@@ -54,11 +53,10 @@ def upload_photo():
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         # Search the entry in SheetDB
-        search_params = {"Email address": Email, "Phone Number": Phone}
+        search_params = {"Email address": Email, "Phone": Phone}
         query_string = urlencode(search_params)
         response = requests.get(f"{sheetdb_url}/search?{query_string}")
         response_data = response.json()
-
         if response.status_code == 200 and response_data:
             # Get the row ID for updating
             row_id = response_data[0].get("id")
